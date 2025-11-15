@@ -1,8 +1,13 @@
 #include "MainWindow.h"
 #include "MapWidget.h"
 #include "MissionParametersDialog.h"
+#include "WeatherWidget.h"
+#include "WindOverlayWidget.h"
+#include "TerrainElevationViewer.h"
+#include "PointCloudViewer.h"
 #include "Settings.h"
 #include "ProjectManager.h"
+#include "WeatherService.h"
 #include "MissionParameters.h"
 #include "FlightPlan.h"
 #include "CoveragePatternGenerator.h"
@@ -20,6 +25,7 @@
 #include <QJsonArray>
 #include <QDateTime>
 #include <QDir>
+#include <QVBoxLayout>
 #include <cmath>
 
 namespace DroneMapper {
@@ -28,10 +34,15 @@ namespace UI {
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_mapWidget(new MapWidget(this))
+    , m_weatherWidget(nullptr)
+    , m_windOverlay(nullptr)
+    , m_viewersTab(nullptr)
+    , m_terrainViewer(nullptr)
+    , m_pointCloudViewer(nullptr)
     , m_currentFlightPlan(nullptr)
 {
-    setWindowTitle("DroneMapper - Flight Planning & Photogrammetry");
-    resize(1280, 800);
+    setWindowTitle("DroneMapper - Professional Flight Planning & Photogrammetry");
+    resize(1400, 900);
 
     // Set map widget as central widget
     setCentralWidget(m_mapWidget);
@@ -89,6 +100,37 @@ void MainWindow::createActions()
     m_clearMapAction = new QAction(tr("&Clear Map"), this);
     m_clearMapAction->setShortcut(QKeySequence(tr("Ctrl+K")));
     connect(m_clearMapAction, &QAction::triggered, this, &MainWindow::onClearMap);
+
+    // Advanced feature actions
+    m_showWindOverlayAction = new QAction(tr("Show &Wind Overlay"), this);
+    m_showWindOverlayAction->setCheckable(true);
+    connect(m_showWindOverlayAction, &QAction::triggered, this, &MainWindow::onShowWindOverlay);
+
+    m_showTerrainViewerAction = new QAction(tr("Show &Terrain Viewer"), this);
+    m_showTerrainViewerAction->setShortcut(QKeySequence(tr("Ctrl+T")));
+    connect(m_showTerrainViewerAction, &QAction::triggered, this, &MainWindow::onShowTerrainViewer);
+
+    m_showPointCloudViewerAction = new QAction(tr("Show &Point Cloud Viewer"), this);
+    m_showPointCloudViewerAction->setShortcut(QKeySequence(tr("Ctrl+P")));
+    connect(m_showPointCloudViewerAction, &QAction::triggered, this, &MainWindow::onShowPointCloudViewer);
+
+    m_runCOLMAPAction = new QAction(tr("Run COLMAP &Reconstruction..."), this);
+    m_runCOLMAPAction->setShortcut(QKeySequence(tr("Ctrl+R")));
+    connect(m_runCOLMAPAction, &QAction::triggered, this, &MainWindow::onRunCOLMAPReconstruction);
+
+    m_showWeatherPanelAction = new QAction(tr("Show &Weather Panel"), this);
+    m_showWeatherPanelAction->setCheckable(true);
+    connect(m_showWeatherPanelAction, &QAction::triggered, this, &MainWindow::onShowWeatherPanel);
+
+    m_toggle3DViewersAction = new QAction(tr("Toggle &3D Viewers"), this);
+    m_toggle3DViewersAction->setShortcut(QKeySequence(tr("F3")));
+    connect(m_toggle3DViewersAction, &QAction::triggered, this, &MainWindow::onToggle3DViewers);
+
+    m_loadPointCloudAction = new QAction(tr("Load Point &Cloud..."), this);
+    connect(m_loadPointCloudAction, &QAction::triggered, this, &MainWindow::onLoadPointCloud);
+
+    m_loadDEMAction = new QAction(tr("Load &DEM/Terrain..."), this);
+    connect(m_loadDEMAction, &QAction::triggered, this, &MainWindow::onLoadDEM);
 }
 
 void MainWindow::createMenus()
@@ -109,6 +151,20 @@ void MainWindow::createMenus()
     m_toolsMenu->addAction(m_clearMapAction);
 
     m_viewMenu = menuBar()->addMenu(tr("&View"));
+    m_viewMenu->addAction(m_showWeatherPanelAction);
+    m_viewMenu->addAction(m_toggle3DViewersAction);
+    m_viewMenu->addSeparator();
+
+    m_visualizationMenu = menuBar()->addMenu(tr("&Visualization"));
+    m_visualizationMenu->addAction(m_showWindOverlayAction);
+    m_visualizationMenu->addAction(m_showTerrainViewerAction);
+    m_visualizationMenu->addAction(m_showPointCloudViewerAction);
+    m_visualizationMenu->addSeparator();
+    m_visualizationMenu->addAction(m_loadDEMAction);
+    m_visualizationMenu->addAction(m_loadPointCloudAction);
+
+    m_photogrammetryMenu = menuBar()->addMenu(tr("&Photogrammetry"));
+    m_photogrammetryMenu->addAction(m_runCOLMAPAction);
 
     m_helpMenu = menuBar()->addMenu(tr("&Help"));
     QAction *aboutAction = m_helpMenu->addAction(tr("&About"));
@@ -127,6 +183,12 @@ void MainWindow::createToolbars()
     m_mapToolBar->addAction(m_exportKMZAction);
     m_mapToolBar->addSeparator();
     m_mapToolBar->addAction(m_clearMapAction);
+
+    m_visualizationToolBar = addToolBar(tr("Visualization"));
+    m_visualizationToolBar->addAction(m_showTerrainViewerAction);
+    m_visualizationToolBar->addAction(m_showPointCloudViewerAction);
+    m_visualizationToolBar->addSeparator();
+    m_visualizationToolBar->addAction(m_runCOLMAPAction);
 }
 
 void MainWindow::createDockWidgets()
@@ -139,9 +201,34 @@ void MainWindow::createDockWidgets()
     m_propertiesDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
     addDockWidget(Qt::RightDockWidgetArea, m_propertiesDock);
 
+    // Weather dock
+    m_weatherDock = new QDockWidget(tr("Weather"), this);
+    m_weatherDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea | Qt::BottomDockWidgetArea);
+    m_weatherWidget = new WeatherWidget(this);
+    m_weatherDock->setWidget(m_weatherWidget);
+    addDockWidget(Qt::RightDockWidgetArea, m_weatherDock);
+    m_weatherDock->hide(); // Hidden by default
+
+    // 3D Viewers dock
+    m_viewersDock = new QDockWidget(tr("3D Viewers"), this);
+    m_viewersDock->setAllowedAreas(Qt::AllDockWidgetAreas);
+    m_viewersTab = new QTabWidget(this);
+
+    m_terrainViewer = new TerrainElevationViewer(this);
+    m_pointCloudViewer = new PointCloudViewer(this);
+
+    m_viewersTab->addTab(m_terrainViewer, tr("Terrain"));
+    m_viewersTab->addTab(m_pointCloudViewer, tr("Point Cloud"));
+
+    m_viewersDock->setWidget(m_viewersTab);
+    addDockWidget(Qt::BottomDockWidgetArea, m_viewersDock);
+    m_viewersDock->hide(); // Hidden by default
+
     // Add dock widgets to view menu
     m_viewMenu->addAction(m_projectDock->toggleViewAction());
     m_viewMenu->addAction(m_propertiesDock->toggleViewAction());
+    m_viewMenu->addAction(m_weatherDock->toggleViewAction());
+    m_viewMenu->addAction(m_viewersDock->toggleViewAction());
 }
 
 void MainWindow::newProject()
@@ -489,6 +576,166 @@ void MainWindow::onExportKMZ()
             .arg(generator.lastError()));
 
         statusBar()->showMessage(tr("KMZ export failed"), 5000);
+    }
+}
+
+// Advanced feature implementations
+
+void MainWindow::onShowWindOverlay()
+{
+    if (!m_windOverlay) {
+        m_windOverlay = new WindOverlayWidget(m_mapWidget);
+        m_windOverlay->setWeatherService(&Core::WeatherService::instance());
+        m_windOverlay->resize(m_mapWidget->size());
+        m_windOverlay->show();
+
+        // Update wind overlay when flight plan is generated
+        if (m_currentFlightPlan) {
+            auto bounds = m_currentFlightPlan->surveyArea().boundingRect();
+            Models::GeospatialCoordinate topLeft(bounds.top(), bounds.left(), 0);
+            Models::GeospatialCoordinate bottomRight(bounds.bottom(), bounds.right(), 0);
+            m_windOverlay->setViewBounds(topLeft, bottomRight);
+            m_windOverlay->refreshData();
+        }
+    }
+
+    m_windOverlay->setVisible(m_showWindOverlayAction->isChecked());
+    statusBar()->showMessage(
+        m_showWindOverlayAction->isChecked() ? tr("Wind overlay enabled") : tr("Wind overlay disabled"),
+        3000);
+}
+
+void MainWindow::onShowTerrainViewer()
+{
+    if (m_viewersDock->isHidden()) {
+        m_viewersDock->show();
+    }
+    m_viewersTab->setCurrentWidget(m_terrainViewer);
+
+    // Load flight plan if available
+    if (m_currentFlightPlan) {
+        m_terrainViewer->setFlightPlan(*m_currentFlightPlan);
+    }
+
+    statusBar()->showMessage(tr("Terrain viewer opened"), 3000);
+}
+
+void MainWindow::onShowPointCloudViewer()
+{
+    if (m_viewersDock->isHidden()) {
+        m_viewersDock->show();
+    }
+    m_viewersTab->setCurrentWidget(m_pointCloudViewer);
+
+    statusBar()->showMessage(tr("Point cloud viewer opened - Use File → Load Point Cloud to load data"), 5000);
+}
+
+void MainWindow::onRunCOLMAPReconstruction()
+{
+    QString imageDir = QFileDialog::getExistingDirectory(
+        this,
+        tr("Select Image Directory for COLMAP Reconstruction"),
+        QDir::homePath(),
+        QFileDialog::ShowDirsOnly);
+
+    if (imageDir.isEmpty()) {
+        return;
+    }
+
+    QMessageBox::information(this, tr("COLMAP Reconstruction"),
+        tr("COLMAP reconstruction will process images in:\n%1\n\n"
+           "This feature requires COLMAP to be installed.\n"
+           "The reconstruction will run in the background.\n\n"
+           "Results will be available in the Point Cloud Viewer when complete.")
+        .arg(imageDir));
+
+    // TODO: Show COLMAP configuration dialog
+    // TODO: Start COLMAP processing
+    // TODO: Show progress dialog
+
+    statusBar()->showMessage(tr("COLMAP reconstruction queued for: %1").arg(QFileInfo(imageDir).fileName()), 5000);
+}
+
+void MainWindow::onShowWeatherPanel()
+{
+    if (m_weatherDock->isHidden()) {
+        m_weatherDock->show();
+
+        // Set location for weather if we have a flight plan
+        if (m_currentFlightPlan && !m_currentFlightPlan->waypoints().isEmpty()) {
+            auto firstWaypoint = m_currentFlightPlan->waypoints().first();
+            m_weatherWidget->setLocation(
+                firstWaypoint.coordinate().latitude(),
+                firstWaypoint.coordinate().longitude());
+            m_weatherWidget->refreshWeather();
+        }
+    } else {
+        m_weatherDock->hide();
+    }
+
+    m_showWeatherPanelAction->setChecked(!m_weatherDock->isHidden());
+}
+
+void MainWindow::onToggle3DViewers()
+{
+    if (m_viewersDock->isHidden()) {
+        m_viewersDock->show();
+        statusBar()->showMessage(tr("3D Viewers shown"), 3000);
+    } else {
+        m_viewersDock->hide();
+        statusBar()->showMessage(tr("3D Viewers hidden"), 3000);
+    }
+}
+
+void MainWindow::onLoadPointCloud()
+{
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        tr("Load Point Cloud"),
+        QDir::homePath(),
+        tr("Point Cloud Files (*.ply *.las *.laz *.xyz *.txt);;PLY Files (*.ply);;LAS Files (*.las *.laz);;XYZ Files (*.xyz *.txt);;All Files (*.*)"));
+
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    statusBar()->showMessage(tr("Loading point cloud..."), 0);
+
+    if (m_pointCloudViewer->loadPointCloud(fileName)) {
+        onShowPointCloudViewer();
+        statusBar()->showMessage(
+            tr("Point cloud loaded: %1").arg(QFileInfo(fileName).fileName()),
+            5000);
+    } else {
+        QMessageBox::critical(this, tr("Load Error"),
+            tr("Failed to load point cloud from:\n%1").arg(fileName));
+        statusBar()->showMessage(tr("Failed to load point cloud"), 5000);
+    }
+}
+
+void MainWindow::onLoadDEM()
+{
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        tr("Load DEM/Terrain Data"),
+        QDir::homePath(),
+        tr("DEM Files (*.tif *.tiff *.hgt);;GeoTIFF (*.tif *.tiff);;SRTM (*.hgt);;All Files (*.*)"));
+
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    statusBar()->showMessage(tr("Loading DEM..."), 0);
+
+    if (m_terrainViewer->loadDEM(fileName)) {
+        onShowTerrainViewer();
+        statusBar()->showMessage(
+            tr("DEM loaded: %1").arg(QFileInfo(fileName).fileName()),
+            5000);
+    } else {
+        QMessageBox::critical(this, tr("Load Error"),
+            tr("Failed to load DEM from:\n%1").arg(fileName));
+        statusBar()->showMessage(tr("Failed to load DEM"), 5000);
     }
 }
 

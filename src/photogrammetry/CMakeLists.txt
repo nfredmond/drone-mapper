@@ -1,5 +1,7 @@
 add_library(DroneMapperPhotogrammetry STATIC
     ${CMAKE_SOURCE_DIR}/include/photogrammetry/QualityEstimator.h
+    ${CMAKE_SOURCE_DIR}/include/photogrammetry/GPUDetector.h
+    ${CMAKE_SOURCE_DIR}/include/photogrammetry/ProcessingQueue.h
     ProcessingPipeline.cpp
     ImageProcessor.cpp
     PointCloudGenerator.cpp
@@ -7,6 +9,8 @@ add_library(DroneMapperPhotogrammetry STATIC
     MeshGenerator.cpp
     ExportHandler.cpp
     QualityEstimator.cpp
+    GPUDetector.cpp
+    ProcessingQueue.cpp
 )
 
 target_link_libraries(DroneMapperPhotogrammetry

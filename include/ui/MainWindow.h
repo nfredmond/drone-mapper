@@ -22,6 +22,7 @@ class WeatherWidget;
 class WindOverlayWidget;
 class TerrainElevationViewer;
 class PointCloudViewer;
+class SimulationPreviewWidget;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -53,6 +54,8 @@ private slots:
     void onToggle3DViewers();
     void onLoadPointCloud();
     void onLoadDEM();
+    void onPreviewMission();
+    void onGenerateReport();
 
 private:
     void createActions();
@@ -82,11 +85,14 @@ private:
     QAction *m_toggle3DViewersAction;
     QAction *m_loadPointCloudAction;
     QAction *m_loadDEMAction;
+    QAction *m_previewMissionAction;
+    QAction *m_generateReportAction;
 
     // Menus
     QMenu *m_fileMenu;
     QMenu *m_editMenu;
     QMenu *m_viewMenu;
+    QMenu *m_missionMenu;
     QMenu *m_toolsMenu;
     QMenu *m_visualizationMenu;
     QMenu *m_photogrammetryMenu;
@@ -112,6 +118,7 @@ private:
     QTabWidget *m_viewersTab;
     TerrainElevationViewer *m_terrainViewer;
     PointCloudViewer *m_pointCloudViewer;
+    SimulationPreviewWidget *m_simulationPreview;
 
     // Current state
     QString m_currentAreaGeoJson;

@@ -7,6 +7,7 @@ add_library(DroneMapperUI STATIC
     ${CMAKE_SOURCE_DIR}/include/ui/WindOverlayWidget.h
     ${CMAKE_SOURCE_DIR}/include/ui/TerrainElevationViewer.h
     ${CMAKE_SOURCE_DIR}/include/ui/PointCloudViewer.h
+    ${CMAKE_SOURCE_DIR}/include/ui/SimulationPreviewWidget.h
     MainWindow.cpp
     MapWidget.cpp
     MapBridge.cpp
@@ -18,6 +19,7 @@ add_library(DroneMapperUI STATIC
     WindOverlayWidget.cpp
     TerrainElevationViewer.cpp
     PointCloudViewer.cpp
+    SimulationPreviewWidget.cpp
 )
 
 target_link_libraries(DroneMapperUI

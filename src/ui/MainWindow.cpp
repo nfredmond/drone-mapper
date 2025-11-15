@@ -5,7 +5,9 @@
 #include "WindOverlayWidget.h"
 #include "TerrainElevationViewer.h"
 #include "PointCloudViewer.h"
+#include "SimulationPreviewWidget.h"
 #include "Settings.h"
+#include "ReportGenerator.h"
 #include "ProjectManager.h"
 #include "WeatherService.h"
 #include "MissionParameters.h"
@@ -26,6 +28,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QVBoxLayout>
+#include <QDesktopServices>
 #include <cmath>
 
 namespace DroneMapper {
@@ -39,6 +42,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_viewersTab(nullptr)
     , m_terrainViewer(nullptr)
     , m_pointCloudViewer(nullptr)
+    , m_simulationPreview(nullptr)
     , m_currentFlightPlan(nullptr)
 {
     setWindowTitle("DroneMapper - Professional Flight Planning & Photogrammetry");
@@ -131,6 +135,17 @@ void MainWindow::createActions()
 
     m_loadDEMAction = new QAction(tr("Load &DEM/Terrain..."), this);
     connect(m_loadDEMAction, &QAction::triggered, this, &MainWindow::onLoadDEM);
+
+    // Mission actions
+    m_previewMissionAction = new QAction(tr("&Preview Mission Simulation"), this);
+    m_previewMissionAction->setShortcut(QKeySequence(tr("Ctrl+Shift+P")));
+    m_previewMissionAction->setEnabled(false);  // Enabled when flight plan exists
+    connect(m_previewMissionAction, &QAction::triggered, this, &MainWindow::onPreviewMission);
+
+    m_generateReportAction = new QAction(tr("Generate Mission &Report..."), this);
+    m_generateReportAction->setShortcut(QKeySequence(tr("Ctrl+Shift+R")));
+    m_generateReportAction->setEnabled(false);  // Enabled when flight plan exists
+    connect(m_generateReportAction, &QAction::triggered, this, &MainWindow::onGenerateReport);
 }
 
 void MainWindow::createMenus()
@@ -149,6 +164,10 @@ void MainWindow::createMenus()
     m_toolsMenu = menuBar()->addMenu(tr("&Tools"));
     m_toolsMenu->addAction(m_generateFlightPlanAction);
     m_toolsMenu->addAction(m_clearMapAction);
+
+    m_missionMenu = menuBar()->addMenu(tr("&Mission"));
+    m_missionMenu->addAction(m_previewMissionAction);
+    m_missionMenu->addAction(m_generateReportAction);
 
     m_viewMenu = menuBar()->addMenu(tr("&View"));
     m_viewMenu->addAction(m_showWeatherPanelAction);
@@ -459,8 +478,10 @@ void MainWindow::onGenerateFlightPlan()
     }
     m_currentFlightPlan = new Models::FlightPlan(plan);
 
-    // Enable export
+    // Enable export and mission actions
     m_exportKMZAction->setEnabled(true);
+    m_previewMissionAction->setEnabled(true);
+    m_generateReportAction->setEnabled(true);
 
     statusBar()->showMessage(
         tr("Flight plan generated: %1 waypoints, %2m distance, %3min flight time")
@@ -482,6 +503,8 @@ void MainWindow::onClearMap()
 
     m_generateFlightPlanAction->setEnabled(false);
     m_exportKMZAction->setEnabled(false);
+    m_previewMissionAction->setEnabled(false);
+    m_generateReportAction->setEnabled(false);
     statusBar()->showMessage(tr("Map cleared"), 3000);
 }
 
@@ -736,6 +759,115 @@ void MainWindow::onLoadDEM()
         QMessageBox::critical(this, tr("Load Error"),
             tr("Failed to load DEM from:\n%1").arg(fileName));
         statusBar()->showMessage(tr("Failed to load DEM"), 5000);
+    }
+}
+
+void MainWindow::onPreviewMission()
+{
+    if (!m_currentFlightPlan) {
+        QMessageBox::warning(this, tr("No Flight Plan"),
+            tr("Please generate a flight plan first."));
+        return;
+    }
+
+    if (!m_simulationPreview) {
+        m_simulationPreview = new SimulationPreviewWidget(this);
+        connect(m_simulationPreview, &SimulationPreviewWidget::closed,
+                [this]() { m_simulationPreview->deleteLater(); m_simulationPreview = nullptr; });
+    }
+
+    m_simulationPreview->loadFlightPlan(*m_currentFlightPlan);
+    m_simulationPreview->show();
+    m_simulationPreview->raise();
+    m_simulationPreview->activateWindow();
+
+    statusBar()->showMessage(tr("Mission simulation preview opened"), 3000);
+}
+
+void MainWindow::onGenerateReport()
+{
+    if (!m_currentFlightPlan) {
+        QMessageBox::warning(this, tr("No Flight Plan"),
+            tr("Please generate a flight plan first."));
+        return;
+    }
+
+    // Ask user for report format
+    QStringList formats;
+    formats << "HTML" << "Markdown" << "PDF (HTML-based)";
+
+    bool ok;
+    QString format = QInputDialog::getItem(this, tr("Select Report Format"),
+        tr("Choose report format:"), formats, 0, false, &ok);
+
+    if (!ok || format.isEmpty()) {
+        return;
+    }
+
+    // Get output file path
+    QString filter;
+    QString defaultExt;
+    Core::ReportFormat reportFormat;
+
+    if (format.startsWith("HTML")) {
+        filter = tr("HTML Files (*.html)");
+        defaultExt = ".html";
+        reportFormat = Core::ReportFormat::HTML;
+    } else if (format.startsWith("Markdown")) {
+        filter = tr("Markdown Files (*.md)");
+        defaultExt = ".md";
+        reportFormat = Core::ReportFormat::Markdown;
+    } else {
+        filter = tr("HTML Files (*.html)");
+        defaultExt = ".html";
+        reportFormat = Core::ReportFormat::HTML;  // PDF via HTML for now
+    }
+
+    QString fileName = QFileDialog::getSaveFileName(
+        this,
+        tr("Save Mission Report"),
+        QDir::homePath() + "/mission_report" + defaultExt,
+        filter);
+
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    // Set up report options
+    Core::ReportOptions options;
+    options.companyName = "DroneMapper Professional";
+    options.projectName = "Mission Report";
+    options.sections.includeCoverPage = true;
+    options.sections.includeMissionOverview = true;
+    options.sections.includeFlightPathMap = true;
+    options.sections.includeStatistics = true;
+    options.sections.includeCostBreakdown = true;
+    options.sections.includeWeatherAnalysis = true;
+    options.sections.includeSafetyAnalysis = true;
+    options.sections.includeEquipment = true;
+    options.sections.includePhotogrammetryPlan = true;
+
+    // Generate report
+    Core::ReportGenerator generator;
+    statusBar()->showMessage(tr("Generating report..."), 0);
+
+    if (generator.generateReport(*m_currentFlightPlan, fileName, reportFormat, options)) {
+        statusBar()->showMessage(tr("Report generated successfully: %1").arg(fileName), 5000);
+
+        // Ask if user wants to open the report
+        QMessageBox::StandardButton reply = QMessageBox::question(
+            this,
+            tr("Report Generated"),
+            tr("Report generated successfully!\n\nWould you like to open it?"),
+            QMessageBox::Yes | QMessageBox::No);
+
+        if (reply == QMessageBox::Yes) {
+            QDesktopServices::openUrl(QUrl::fromLocalFile(fileName));
+        }
+    } else {
+        QMessageBox::critical(this, tr("Report Error"),
+            tr("Failed to generate report:\n%1").arg(generator.lastError()));
+        statusBar()->showMessage(tr("Failed to generate report"), 5000);
     }
 }
 

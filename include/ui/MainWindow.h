@@ -8,6 +8,9 @@
 #include <QDockWidget>
 
 namespace DroneMapper {
+namespace Models {
+    class FlightPlan;
+}
 namespace UI {
 
 class MapWidget;
@@ -72,6 +75,7 @@ private:
 
     // Current state
     QString m_currentAreaGeoJson;
+    Models::FlightPlan *m_currentFlightPlan;
 };
 
 } // namespace UI

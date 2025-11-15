@@ -28,6 +28,7 @@ namespace UI {
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_mapWidget(new MapWidget(this))
+    , m_currentFlightPlan(nullptr)
 {
     setWindowTitle("DroneMapper - Flight Planning & Photogrammetry");
     resize(1280, 800);
@@ -365,6 +366,12 @@ void MainWindow::onGenerateFlightPlan()
     m_mapWidget->displayFlightPath(plan);
     m_mapWidget->updateFlightInfo(totalDistance, flightTime, photoCount);
 
+    // Store flight plan for export
+    if (m_currentFlightPlan) {
+        delete m_currentFlightPlan;
+    }
+    m_currentFlightPlan = new Models::FlightPlan(plan);
+
     // Enable export
     m_exportKMZAction->setEnabled(true);
 
@@ -380,6 +387,12 @@ void MainWindow::onClearMap()
 {
     m_mapWidget->clearMap();
     m_currentAreaGeoJson.clear();
+
+    if (m_currentFlightPlan) {
+        delete m_currentFlightPlan;
+        m_currentFlightPlan = nullptr;
+    }
+
     m_generateFlightPlanAction->setEnabled(false);
     m_exportKMZAction->setEnabled(false);
     statusBar()->showMessage(tr("Map cleared"), 3000);
@@ -387,25 +400,96 @@ void MainWindow::onClearMap()
 
 void MainWindow::onExportKMZ()
 {
-    QString fileName = QFileDialog::getSaveFileName(this,
-        tr("Export KMZ Flight Plan"),
-        QDir::homePath() + "/flight_plan.kmz",
-        tr("KMZ Files (*.kmz)"));
-
-    if (fileName.isEmpty()) {
+    if (!m_currentFlightPlan) {
+        QMessageBox::warning(this, tr("No Flight Plan"),
+            tr("Please generate a flight plan first."));
         return;
     }
 
-    // Get current flight plan from map
-    // TODO: Store the current flight plan properly
-    QMessageBox::information(this, tr("Export KMZ"),
-        tr("KMZ export functionality will be fully implemented in the Mission Parameters Dialog.\n\n"
-           "For now, you can:\n"
-           "1. Configure mission parameters\n"
-           "2. Select drone model\n"
-           "3. Export to KMZ for DJI Fly import"));
+    // Ask user to select drone model
+    QStringList droneModels;
+    droneModels << tr("DJI Mini 3")
+                << tr("DJI Mini 3 Pro")
+                << tr("DJI Air 3")
+                << tr("DJI Mavic 3")
+                << tr("DJI Mavic 3 Pro");
 
-    statusBar()->showMessage(tr("KMZ export feature coming next..."), 5000);
+    bool ok;
+    QString selectedModel = QInputDialog::getItem(this,
+        tr("Select Drone Model"),
+        tr("Choose your DJI drone model for KMZ export:"),
+        droneModels,
+        0, // Default to Mini 3
+        false, // Not editable
+        &ok);
+
+    if (!ok) {
+        return; // User cancelled
+    }
+
+    // Map selection to DroneModel enum
+    Geospatial::WPMLWriter::DroneModel droneModel;
+    if (selectedModel.contains("Mini 3 Pro")) {
+        droneModel = Geospatial::WPMLWriter::DroneModel::Mini3Pro;
+    } else if (selectedModel.contains("Mini 3")) {
+        droneModel = Geospatial::WPMLWriter::DroneModel::Mini3;
+    } else if (selectedModel.contains("Air 3")) {
+        droneModel = Geospatial::WPMLWriter::DroneModel::Air3;
+    } else if (selectedModel.contains("Mavic 3 Pro")) {
+        droneModel = Geospatial::WPMLWriter::DroneModel::Mavic3Pro;
+    } else {
+        droneModel = Geospatial::WPMLWriter::DroneModel::Mavic3;
+    }
+
+    // Get save file path
+    QString defaultName = QString("flight_plan_%1.kmz")
+        .arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss"));
+
+    QString fileName = QFileDialog::getSaveFileName(this,
+        tr("Export KMZ Flight Plan"),
+        QDir::homePath() + "/" + defaultName,
+        tr("KMZ Files (*.kmz)"));
+
+    if (fileName.isEmpty()) {
+        return; // User cancelled
+    }
+
+    // Ensure .kmz extension
+    if (!fileName.endsWith(".kmz", Qt::CaseInsensitive)) {
+        fileName += ".kmz";
+    }
+
+    // Generate and save KMZ
+    statusBar()->showMessage(tr("Generating KMZ file..."), 0);
+
+    Geospatial::KMZGenerator generator;
+    if (generator.generate(*m_currentFlightPlan, fileName, droneModel)) {
+        QMessageBox::information(this, tr("Export Successful"),
+            tr("KMZ file created successfully!\n\n"
+               "File: %1\n\n"
+               "To use this flight plan:\n"
+               "1. Copy the KMZ file to your mobile device\n"
+               "2. Open DJI Fly app\n"
+               "3. Go to Create tab\n"
+               "4. Tap the '+' button\n"
+               "5. Select 'Import' and choose this KMZ file\n"
+               "6. Review the mission and fly safely!\n\n"
+               "Waypoints: %2\n"
+               "Drone Model: %3")
+            .arg(fileName)
+            .arg(m_currentFlightPlan->waypointCount())
+            .arg(selectedModel));
+
+        statusBar()->showMessage(
+            tr("KMZ exported successfully to %1").arg(QFileInfo(fileName).fileName()),
+            10000);
+    } else {
+        QMessageBox::critical(this, tr("Export Failed"),
+            tr("Failed to generate KMZ file.\n\nError: %1")
+            .arg(generator.lastError()));
+
+        statusBar()->showMessage(tr("KMZ export failed"), 5000);
+    }
 }
 
 } // namespace UI

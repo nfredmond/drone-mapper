@@ -8,6 +8,7 @@ add_library(DroneMapperCore STATIC
     ${CMAKE_SOURCE_DIR}/include/core/SunCalculator.h
     ${CMAKE_SOURCE_DIR}/include/core/FlightPathOptimizer.h
     ${CMAKE_SOURCE_DIR}/include/core/AltitudeSafetyChecker.h
+    ${CMAKE_SOURCE_DIR}/include/core/MissionStatistics.h
     ProjectManager.cpp
     DatabaseManager.cpp
     Settings.cpp
@@ -17,6 +18,7 @@ add_library(DroneMapperCore STATIC
     SunCalculator.cpp
     FlightPathOptimizer.cpp
     AltitudeSafetyChecker.cpp
+    MissionStatistics.cpp
 )
 
 target_link_libraries(DroneMapperCore

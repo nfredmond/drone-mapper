@@ -201,7 +201,7 @@ double MissionStatistics::calculateSurveyArea(
     }
 
     // Calculate camera footprint width
-    double altitude = params.altitude();
+    double altitude = params.flightAltitude();
     double focalLength, sensorWidth;
     int imageWidth, imageHeight;
     calculateCameraSpecs(params.cameraModel(), focalLength, sensorWidth,
@@ -243,7 +243,7 @@ int MissionStatistics::estimatePhotoCount(
     calculateCameraSpecs(params.cameraModel(), focalLength, sensorWidth,
                         imageWidth, imageHeight);
 
-    double altitude = params.altitude();
+    double altitude = params.flightAltitude();
     double speed = params.flightSpeed();
 
     // Calculate footprint dimensions

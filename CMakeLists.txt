@@ -18,6 +18,8 @@ find_package(Qt6 REQUIRED COMPONENTS
     WebEngineWidgets
     Concurrent
     PrintSupport
+    OpenGL
+    OpenGLWidgets
 )
 
 find_package(GDAL REQUIRED)

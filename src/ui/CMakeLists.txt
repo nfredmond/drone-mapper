@@ -5,6 +5,7 @@ add_library(DroneMapperUI STATIC
     ${CMAKE_SOURCE_DIR}/include/ui/MissionParametersDialog.h
     ${CMAKE_SOURCE_DIR}/include/ui/WeatherWidget.h
     ${CMAKE_SOURCE_DIR}/include/ui/WindOverlayWidget.h
+    ${CMAKE_SOURCE_DIR}/include/ui/TerrainElevationViewer.h
     MainWindow.cpp
     MapWidget.cpp
     MapBridge.cpp
@@ -14,11 +15,14 @@ add_library(DroneMapperUI STATIC
     DrawingToolsWidget.cpp
     WeatherWidget.cpp
     WindOverlayWidget.cpp
+    TerrainElevationViewer.cpp
 )
 
 target_link_libraries(DroneMapperUI
     Qt6::Widgets
     Qt6::Gui
+    Qt6::OpenGL
+    Qt6::OpenGLWidgets
     Qt6::WebEngineWidgets
     DroneMapperCore
     DroneMapperModels

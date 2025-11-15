@@ -1,7 +1,10 @@
 add_library(DroneMapperUI STATIC
     ${CMAKE_SOURCE_DIR}/include/ui/MainWindow.h
+    ${CMAKE_SOURCE_DIR}/include/ui/MapWidget.h
+    ${CMAKE_SOURCE_DIR}/include/ui/MapBridge.h
     MainWindow.cpp
     MapWidget.cpp
+    MapBridge.cpp
     FlightPlanningWidget.cpp
     ProjectExplorer.cpp
     MissionParametersDialog.cpp

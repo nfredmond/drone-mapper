@@ -11,6 +11,9 @@ add_library(DroneMapperCore STATIC
     ${CMAKE_SOURCE_DIR}/include/core/MissionStatistics.h
     ${CMAKE_SOURCE_DIR}/include/core/ProjectExporter.h
     ${CMAKE_SOURCE_DIR}/include/core/NoFlyZoneChecker.h
+    ${CMAKE_SOURCE_DIR}/include/core/ReportGenerator.h
+    ${CMAKE_SOURCE_DIR}/include/core/MissionSimulator.h
+    ${CMAKE_SOURCE_DIR}/include/core/ImageManager.h
     ProjectManager.cpp
     DatabaseManager.cpp
     Settings.cpp
@@ -23,6 +26,9 @@ add_library(DroneMapperCore STATIC
     MissionStatistics.cpp
     ProjectExporter.cpp
     NoFlyZoneChecker.cpp
+    ReportGenerator.cpp
+    MissionSimulator.cpp
+    ImageManager.cpp
 )
 
 target_link_libraries(DroneMapperCore

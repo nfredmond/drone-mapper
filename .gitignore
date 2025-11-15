@@ -1,0 +1,135 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+*.build/
+
+# Qt MOC/UIC generated files
+*_autogen/
+moc_*.cpp
+moc_*.h
+ui_*.h
+qrc_*.cpp
+
+# Compiled Object files
+*.o
+*.obj
+*.lo
+*.slo
+
+# Compiled Dynamic libraries
+*.so
+*.so.*
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.a
+*.lib
+*.la
+
+# Executables
+*.exe
+*.out
+*.app
+DroneMapper
+dronemapper
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+
+# Qt Creator
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+
+# QtCreator
+*.autosave
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# C++ specific
+*.d
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Logs
+*.log
+
+# Package files
+*.deb
+*.rpm
+*.dmg
+*.pkg
+
+# Database files (runtime)
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# User data (don't commit user projects)
+user_projects/
+output/
+*.kmz
+*.kml
+
+# Documentation build
+docs/_build/
+docs/.buildinfo
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.directory
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Coverage
+*.gcov
+*.gcno
+*.gcda
+
+# Profiling
+*.prof
+gmon.out
+
+# Qt resource compiled files
+qrc_*.cpp
+
+# Qt MOC files
+moc_*.cpp
+moc_*.h
+
+# Qt UI files (generated)
+ui_*.h

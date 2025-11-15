@@ -1,0 +1,8 @@
+#include "DrawingToolsWidget.h"
+
+// Placeholder
+namespace DroneMapper {
+namespace UI {
+
+} // namespace UI
+} // namespace DroneMapper

@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 #include "MapWidget.h"
+#include "MissionParametersDialog.h"
 #include "Settings.h"
 #include "ProjectManager.h"
 #include "MissionParameters.h"
@@ -242,18 +243,6 @@ void MainWindow::onGenerateFlightPlan()
         return;
     }
 
-    // TODO: Show mission parameters dialog instead of using defaults
-    // For now, use sensible defaults to demonstrate functionality
-
-    bool ok;
-    double altitude = QInputDialog::getDouble(this, tr("Flight Altitude"),
-        tr("Enter flight altitude (meters):"), 100.0, 10.0, 500.0, 1, &ok);
-    if (!ok) return;
-
-    double overlap = QInputDialog::getDouble(this, tr("Photo Overlap"),
-        tr("Enter desired photo overlap (%):"), 75.0, 50.0, 90.0, 1, &ok);
-    if (!ok) return;
-
     // Parse GeoJSON to get polygon coordinates
     QJsonDocument doc = QJsonDocument::fromJson(m_currentAreaGeoJson.toUtf8());
     QJsonObject obj = doc.object();
@@ -293,30 +282,58 @@ void MainWindow::onGenerateFlightPlan()
         return;
     }
 
-    // Create flight plan with mission parameters
+    // Calculate polygon area (rough approximation in square meters)
+    // Convert lat/lon polygon to approximate area
+    double area = 0.0;
+    for (int i = 0; i < polygon.count(); ++i) {
+        int j = (i + 1) % polygon.count();
+        area += polygon[i].x() * polygon[j].y();
+        area -= polygon[j].x() * polygon[i].y();
+    }
+    area = std::abs(area) / 2.0;
+    // Convert from square degrees to square meters (approximate)
+    // At equator, 1 degree ~ 111km, so 1 sq degree ~ 12321 km² = 12,321,000,000 m²
+    // This is very rough - proper calculation would use actual lat/lon
+    double avgLat = 0.0;
+    for (const auto& pt : polygon) {
+        avgLat += pt.y();
+    }
+    avgLat /= polygon.count();
+    double metersPerDegree = 111000.0 * std::cos(avgLat * M_PI / 180.0);
+    area *= metersPerDegree * metersPerDegree;
+
+    // Show mission parameters dialog
+    MissionParametersDialog dialog(this);
+    dialog.setSurveyAreaSize(area);
+
+    if (dialog.exec() != QDialog::Accepted) {
+        return; // User cancelled
+    }
+
+    // Get parameters from dialog
+    Models::MissionParameters params = dialog.parameters();
+
+    // Create flight plan
     Models::FlightPlan plan;
     plan.setName("Flight Plan " + QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm"));
-    plan.setPatternType(Models::FlightPlan::PatternType::Polygon);
+    plan.setPatternType(dialog.patternType());
 
-    // Configure mission parameters
-    plan.parameters().setFlightAltitude(altitude);
-    plan.parameters().setFlightSpeed(10.0); // 10 m/s default
-    plan.parameters().setFrontOverlap(overlap); // Already in percentage
-    plan.parameters().setSideOverlap(overlap);
-    plan.parameters().setCameraModel(Models::MissionParameters::CameraModel::DJI_Mini3);
-    plan.parameters().setGimbalPitch(-90.0); // Nadir
+    // Copy parameters to plan
+    plan.parameters() = params;
 
-    // Calculate spacing based on altitude and overlap
-    // Using simplified calculation - will be improved with actual camera parameters
-    double footprintWidth = altitude * 0.8; // Approximate for DJI Mini 3
-    double spacing = footprintWidth * (1.0 - overlap / 100.0);
+    // Get spacing from parameters (already calculated in dialog)
+    double spacing = params.pathSpacing();
 
     statusBar()->showMessage(tr("Generating flight plan..."), 0);
 
     // Generate coverage pattern
     Geospatial::CoveragePatternGenerator generator;
     auto waypoints = generator.generateParallelLines(
-        polygon, altitude, 0.0, spacing, overlap / 100.0);
+        polygon,
+        params.flightAltitude(),
+        params.flightDirection(),
+        spacing,
+        params.frontOverlap() / 100.0);
 
     if (waypoints.isEmpty()) {
         QMessageBox::warning(this, tr("Generation Failed"),

@@ -4,245 +4,426 @@
     <meta charset="utf-8">
     <title>DroneMapper - Interactive Map</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Use reliable CDNs -->
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     <script src="https://unpkg.com/@mapbox/mapbox-gl-draw@1.4.3/dist/mapbox-gl-draw.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/@mapbox/mapbox-gl-draw@1.4.3/dist/mapbox-gl-draw.css" type="text/css" />
+    <!-- Qt WebChannel -->
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
     <style>
-        body { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #2d2d2d; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; }
 
+        /* Dark Theme Controls */
         .map-controls {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            background: white;
-            border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            padding: 10px;
+            top: 15px;
+            left: 15px;
+            background: rgba(45, 45, 45, 0.95);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            padding: 8px;
             z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            border: 1px solid #444;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .control-label {
+            color: #aaa;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-top: 4px;
+            margin-bottom: 2px;
+            font-weight: 600;
+            padding-left: 2px;
         }
 
         .control-button {
-            background: #0078d4;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            margin: 4px;
+            background: #3d3d3d;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 8px 12px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
         }
 
         .control-button:hover {
-            background: #106ebe;
+            background: #505050;
+            border-color: #777;
         }
 
         .control-button.active {
-            background: #005a9e;
+            background: #2a82da;
+            color: white;
+            border-color: #2a82da;
         }
 
+        .control-button.primary {
+            background: #2a82da;
+            color: white;
+            border-color: #2a82da;
+            font-weight: 600;
+        }
+        
+        .control-button.primary:hover {
+            background: #3a92ea;
+        }
+
+        .control-button.danger {
+            background: #d93025;
+            color: white;
+            border-color: #d93025;
+        }
+
+        /* Info Panel */
         .info-panel {
             position: absolute;
-            top: 10px;
-            right: 10px;
-            background: white;
-            border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            padding: 15px;
-            max-width: 300px;
+            top: 15px;
+            right: 15px;
+            background: rgba(45, 45, 45, 0.95);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            padding: 16px;
+            min-width: 220px;
             z-index: 1000;
-            font-family: Arial, sans-serif;
-            font-size: 12px;
+            color: #e0e0e0;
+            border: 1px solid #444;
         }
 
         .info-panel h3 {
-            margin: 0 0 10px 0;
-            font-size: 14px;
-            color: #333;
+            margin: 0 0 12px 0;
+            font-size: 15px;
+            color: #fff;
+            border-bottom: 1px solid #555;
+            padding-bottom: 8px;
         }
 
-        .info-item {
-            margin: 5px 0;
-            color: #666;
+        .info-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 8px 16px;
+            font-size: 13px;
+        }
+
+        .info-label {
+            color: #aaa;
         }
 
         .info-value {
-            font-weight: bold;
-            color: #0078d4;
+            font-weight: 600;
+            color: #2a82da;
+            text-align: right;
+        }
+
+        /* Loading Overlay */
+        #loading {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #2d2d2d;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 9999;
+            flex-direction: column;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #444;
+            border-top: 4px solid #2a82da;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Custom MapboxDraw Styles */
+        .mapboxgl-ctrl-group {
+            background: #3d3d3d;
+            border: 1px solid #555;
+        }
+        .mapboxgl-ctrl button {
+            background-color: transparent;
+            border: 0;
+        }
+        .mapboxgl-ctrl button:hover {
+            background-color: #505050;
         }
     </style>
 </head>
 <body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div>Initializing Map...</div>
+    </div>
+
     <div id="map"></div>
 
     <div class="map-controls">
-        <button id="btn-polygon" class="control-button">Draw Polygon</button>
-        <button id="btn-rectangle" class="control-button">Draw Rectangle</button>
-        <button id="btn-circle" class="control-button">Draw Circle</button>
-        <button id="btn-waypoint" class="control-button">Add Waypoint</button>
-        <button id="btn-clear" class="control-button">Clear All</button>
-        <button id="btn-generate" class="control-button" style="background: #28a745;">Generate Flight Plan</button>
+        <div class="control-label">Drawing Tools</div>
+        <div class="control-group">
+            <button id="btn-polygon" class="control-button" title="Draw Polygon">⬠ Polygon</button>
+            <button id="btn-rectangle" class="control-button" title="Draw Rectangle">⬜ Rectangle</button>
+            <button id="btn-waypoint" class="control-button" title="Add Waypoint">📍 Point</button>
+            <button id="btn-clear" class="control-button danger" title="Clear All">✕</button>
+        </div>
+        
+        <div class="control-label">Actions</div>
+        <div class="control-group">
+            <button id="btn-generate" class="control-button primary" style="width: 100%">✈ Generate Flight Plan</button>
+        </div>
+        
+        <div class="control-label">View</div>
+        <div class="control-group">
+            <button id="btn-satellite" class="control-button active" onclick="switchBaseMap('satellite')">Satellite</button>
+            <button id="btn-street" class="control-button" onclick="switchBaseMap('osm')">Street</button>
+        </div>
     </div>
 
     <div class="info-panel" id="info-panel" style="display: none;">
-        <h3>Flight Plan Info</h3>
-        <div class="info-item">Area: <span class="info-value" id="info-area">-</span></div>
-        <div class="info-item">Perimeter: <span class="info-value" id="info-perimeter">-</span></div>
-        <div class="info-item">Waypoints: <span class="info-value" id="info-waypoints">0</span></div>
-        <div class="info-item">Distance: <span class="info-value" id="info-distance">-</span></div>
-        <div class="info-item">Est. Time: <span class="info-value" id="info-time">-</span></div>
-        <div class="info-item">Photos: <span class="info-value" id="info-photos">-</span></div>
+        <h3>Survey Area Info</h3>
+        <div class="info-grid">
+            <span class="info-label">Area:</span>
+            <span class="info-value" id="info-area">-</span>
+            
+            <span class="info-label">Perimeter:</span>
+            <span class="info-value" id="info-perimeter">-</span>
+        </div>
+        
+        <div id="flight-stats" style="display: none; margin-top: 15px; padding-top: 10px; border-top: 1px solid #555;">
+            <h3>Flight Plan</h3>
+            <div class="info-grid">
+                <span class="info-label">Waypoints:</span>
+                <span class="info-value" id="info-waypoints">0</span>
+                
+                <span class="info-label">Distance:</span>
+                <span class="info-value" id="info-distance">-</span>
+                
+                <span class="info-label">Est. Time:</span>
+                <span class="info-value" id="info-time">-</span>
+                
+                <span class="info-label">Photos:</span>
+                <span class="info-value" id="info-photos">-</span>
+            </div>
+        </div>
     </div>
 
     <script>
-        // Initialize MapLibre GL
-        const map = new maplibregl.Map({
-            container: 'map',
-            style: {
-                version: 8,
-                sources: {
-                    'osm': {
-                        type: 'raster',
-                        tiles: [
-                            'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
-                        ],
-                        tileSize: 256,
-                        attribution: '&copy; OpenStreetMap Contributors'
-                    },
-                    'satellite': {
-                        type: 'raster',
-                        tiles: [
-                            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-                        ],
-                        tileSize: 256,
-                        attribution: 'Esri, Maxar, Earthstar Geographics'
-                    }
-                },
-                layers: [{
-                    id: 'satellite-layer',
-                    type: 'raster',
-                    source: 'satellite',
-                    minzoom: 0,
-                    maxzoom: 22
-                }],
-                glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf'
-            },
-            center: [-122.4194, 37.7749], // San Francisco default
-            zoom: 14,
-            pitch: 0,
-            bearing: 0
-        });
-
-        // Add navigation controls
-        map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
-        map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
-
-        // Drawing tools
-        const draw = new MapboxDraw({
-            displayControlsDefault: false,
-            controls: {},
-            defaultMode: 'simple_select'
-        });
-        map.addControl(draw);
-
-        // State management
-        let currentMode = null;
-        let flightPathLayer = null;
+        let map, draw;
         let qtBridge = null;
+        
+        function initMap() {
+            try {
+                // Initialize MapLibre GL
+                map = new maplibregl.Map({
+                    container: 'map',
+                    style: {
+                        version: 8,
+                        sources: {
+                            'osm': {
+                                type: 'raster',
+                                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                                tileSize: 256,
+                                attribution: '&copy; OpenStreetMap'
+                            },
+                            'satellite': {
+                                type: 'raster',
+                                tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+                                tileSize: 256,
+                                attribution: 'Esri'
+                            }
+                        },
+                        layers: [{
+                            id: 'base-layer',
+                            type: 'raster',
+                            source: 'satellite',
+                            minzoom: 0,
+                            maxzoom: 22
+                        }],
+                        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf'
+                    },
+                    center: [-122.4194, 37.7749], // San Francisco
+                    zoom: 14,
+                    attributionControl: false
+                });
+                
+                map.addControl(new maplibregl.AttributionControl({ compact: true }));
+                map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
+                map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
 
-        // Initialize Qt WebChannel
-        new QWebChannel(qt.webChannelTransport, function(channel) {
-            qtBridge = channel.objects.mapBridge;
-            console.log('Qt WebChannel initialized');
+                // Setup Drawing
+                draw = new MapboxDraw({
+                    displayControlsDefault: false,
+                    userProperties: true,
+                    styles: [
+                        // Polygon fill
+                        {
+                            'id': 'gl-draw-polygon-fill-inactive',
+                            'type': 'fill',
+                            'filter': ['all', ['==', 'active', 'false'], ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
+                            'paint': {
+                                'fill-color': '#3bb2d0',
+                                'fill-outline-color': '#3bb2d0',
+                                'fill-opacity': 0.1
+                            }
+                        },
+                        {
+                            'id': 'gl-draw-polygon-fill-active',
+                            'type': 'fill',
+                            'filter': ['all', ['==', 'active', 'true'], ['==', '$type', 'Polygon']],
+                            'paint': {
+                                'fill-color': '#fbb03b',
+                                'fill-outline-color': '#fbb03b',
+                                'fill-opacity': 0.1
+                            }
+                        },
+                        // Polygon outline
+                        {
+                            'id': 'gl-draw-polygon-stroke-inactive',
+                            'type': 'line',
+                            'filter': ['all', ['==', 'active', 'false'], ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
+                            'layout': { 'line-cap': 'round', 'line-join': 'round' },
+                            'paint': {
+                                'line-color': '#3bb2d0',
+                                'line-width': 2
+                            }
+                        },
+                        {
+                            'id': 'gl-draw-polygon-stroke-active',
+                            'type': 'line',
+                            'filter': ['all', ['==', 'active', 'true'], ['==', '$type', 'Polygon']],
+                            'layout': { 'line-cap': 'round', 'line-join': 'round' },
+                            'paint': {
+                                'line-color': '#fbb03b',
+                                'line-dasharray': [0.2, 2],
+                                'line-width': 2
+                            }
+                        },
+                        // Points
+                        {
+                            'id': 'gl-draw-point-inactive',
+                            'type': 'circle',
+                            'filter': ['all', ['==', 'active', 'false'], ['==', '$type', 'Point'], ['!=', 'mode', 'static']],
+                            'paint': {
+                                'circle-radius': 5,
+                                'circle-color': '#3bb2d0'
+                            }
+                        },
+                        {
+                            'id': 'gl-draw-point-active',
+                            'type': 'circle',
+                            'filter': ['all', ['==', 'active', 'true'], ['==', '$type', 'Point']],
+                            'paint': {
+                                'circle-radius': 7,
+                                'circle-color': '#fbb03b'
+                            }
+                        }
+                    ]
+                });
+                map.addControl(draw);
 
-            // Notify Qt that map is ready
-            if (qtBridge && qtBridge.onMapReady) {
-                qtBridge.onMapReady();
+                // Map Load Event
+                map.on('load', onMapLoaded);
+                map.on('error', function(e) { console.error('Map Error:', e); });
+
+            } catch (e) {
+                console.error("Initialization failed:", e);
+                document.getElementById('loading').innerHTML = "<div style='color:red'>Failed to load map. Internet connection required.</div>";
             }
-        });
+        }
 
-        // Map loaded event
-        map.on('load', function() {
+        function onMapLoaded() {
+            document.getElementById('loading').style.display = 'none';
             console.log('Map loaded');
 
-            // Add sources for flight path
-            map.addSource('flight-path', {
-                type: 'geojson',
-                data: {
-                    type: 'FeatureCollection',
-                    features: []
-                }
-            });
+            // Initialize Qt Channel
+            if (typeof QWebChannel !== 'undefined') {
+                new QWebChannel(qt.webChannelTransport, function(channel) {
+                    qtBridge = channel.objects.mapBridge;
+                    if (qtBridge && qtBridge.onMapReady) qtBridge.onMapReady();
+                });
+            }
 
-            // Add flight path line layer
+            // Flight Path Layers
+            map.addSource('flight-path', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+            
             map.addLayer({
-                id: 'flight-path-line',
-                type: 'line',
-                source: 'flight-path',
-                paint: {
-                    'line-color': '#ff0000',
+                'id': 'flight-path-line',
+                'type': 'line',
+                'source': 'flight-path',
+                'paint': {
+                    'line-color': '#2a82da',
                     'line-width': 3,
-                    'line-opacity': 0.8
+                    'line-opacity': 0.8,
+                    'line-dasharray': [2, 1]
                 }
             });
 
-            // Add waypoint markers layer
             map.addLayer({
-                id: 'flight-path-points',
-                type: 'circle',
-                source: 'flight-path',
-                paint: {
-                    'circle-radius': 6,
-                    'circle-color': '#ff0000',
-                    'circle-stroke-color': '#ffffff',
+                'id': 'flight-path-points',
+                'type': 'circle',
+                'source': 'flight-path',
+                'filter': ['==', '$type', 'Point'],
+                'paint': {
+                    'circle-radius': 5,
+                    'circle-color': '#ffffff',
+                    'circle-stroke-color': '#2a82da',
                     'circle-stroke-width': 2
-                },
-                filter: ['==', '$type', 'Point']
+                }
             });
-
-            // Add waypoint labels
+            
             map.addLayer({
-                id: 'flight-path-labels',
-                type: 'symbol',
-                source: 'flight-path',
-                layout: {
+                'id': 'flight-path-labels',
+                'type': 'symbol',
+                'source': 'flight-path',
+                'filter': ['==', '$type', 'Point'],
+                'layout': {
                     'text-field': ['get', 'number'],
                     'text-size': 12,
-                    'text-offset': [0, -1.5]
+                    'text-offset': [0, -1.2],
+                    'text-allow-overlap': false
                 },
-                paint: {
+                'paint': {
                     'text-color': '#ffffff',
-                    'text-halo-color': '#000000',
+                    'text-halo-color': '#2a82da',
                     'text-halo-width': 2
-                },
-                filter: ['==', '$type', 'Point']
+                }
             });
-        });
 
-        // Drawing event handlers
-        map.on('draw.create', updateArea);
-        map.on('draw.delete', updateArea);
-        map.on('draw.update', updateArea);
+            // Events
+            map.on('draw.create', updateArea);
+            map.on('draw.delete', updateArea);
+            map.on('draw.update', updateArea);
+        }
 
         function updateArea(e) {
             const data = draw.getAll();
             if (data.features.length > 0) {
                 const feature = data.features[0];
-
-                // Calculate area for polygons
                 if (feature.geometry.type === 'Polygon') {
-                    const area = turf.area(feature);
-                    const rounded_area = Math.round(area * 100) / 100;
-
-                    document.getElementById('info-area').textContent =
-                        rounded_area.toLocaleString() + ' m²';
+                    const area = turfArea(feature);
+                    const perim = turfPerimeter(feature);
+                    
+                    document.getElementById('info-area').textContent = formatArea(area);
+                    document.getElementById('info-perimeter').textContent = formatLength(perim);
                     document.getElementById('info-panel').style.display = 'block';
-
-                    // Send to Qt
+                    
                     if (qtBridge && qtBridge.onAreaDrawn) {
                         qtBridge.onAreaDrawn(JSON.stringify(feature.geometry));
                     }
@@ -252,150 +433,121 @@
             }
         }
 
-        // Button event handlers
-        document.getElementById('btn-polygon').addEventListener('click', function() {
-            draw.changeMode('draw_polygon');
-            setActiveButton('btn-polygon');
-        });
-
-        document.getElementById('btn-rectangle').addEventListener('click', function() {
-            // Custom rectangle mode (simplified)
-            draw.changeMode('draw_polygon');
-            setActiveButton('btn-rectangle');
-        });
-
-        document.getElementById('btn-circle').addEventListener('click', function() {
-            // Circle drawing will be custom implemented
-            draw.changeMode('simple_select');
-            setActiveButton('btn-circle');
-            alert('Click on map to place circle center, then drag to set radius');
-        });
-
-        document.getElementById('btn-waypoint').addEventListener('click', function() {
-            draw.changeMode('draw_point');
-            setActiveButton('btn-waypoint');
-        });
-
-        document.getElementById('btn-clear').addEventListener('click', function() {
-            draw.deleteAll();
-            clearFlightPath();
+        // Button Handlers
+        document.getElementById('btn-polygon').onclick = () => { draw.changeMode('draw_polygon'); setActive('btn-polygon'); };
+        document.getElementById('btn-rectangle').onclick = () => { draw.changeMode('draw_polygon'); setActive('btn-rectangle'); }; // TODO: Custom rect mode
+        document.getElementById('btn-waypoint').onclick = () => { draw.changeMode('draw_point'); setActive('btn-waypoint'); };
+        document.getElementById('btn-clear').onclick = () => { 
+            draw.deleteAll(); 
+            clearFlightPath(); 
             document.getElementById('info-panel').style.display = 'none';
-            setActiveButton(null);
-        });
-
-        document.getElementById('btn-generate').addEventListener('click', function() {
+            if (qtBridge && qtBridge.onAreaDrawn) qtBridge.onAreaDrawn(""); 
+        };
+        document.getElementById('btn-generate').onclick = () => {
             const data = draw.getAll();
             if (data.features.length > 0 && qtBridge && qtBridge.onGenerateFlightPlan) {
                 qtBridge.onGenerateFlightPlan(JSON.stringify(data));
             } else {
-                alert('Please draw a survey area first!');
+                alert("Please draw an area first.");
             }
-        });
+        };
 
-        function setActiveButton(buttonId) {
-            document.querySelectorAll('.control-button').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            if (buttonId) {
-                document.getElementById(buttonId).classList.add('active');
-            }
+        function setActive(id) {
+            document.querySelectorAll('.control-button').forEach(b => b.classList.remove('active'));
+            if (id && !id.includes('satellite') && !id.includes('street')) document.getElementById(id).classList.add('active');
         }
 
-        function clearFlightPath() {
-            if (map.getSource('flight-path')) {
-                map.getSource('flight-path').setData({
-                    type: 'FeatureCollection',
-                    features: []
-                });
+        window.switchBaseMap = function(type) {
+            document.getElementById('btn-satellite').classList.remove('active');
+            document.getElementById('btn-street').classList.remove('active');
+            
+            const source = (type === 'satellite') ? 'satellite' : 'osm';
+            if (map.getSource(source)) {
+                if (map.getLayer('base-layer')) map.removeLayer('base-layer');
+                map.addLayer({
+                    id: 'base-layer',
+                    type: 'raster',
+                    source: source,
+                    minzoom: 0, maxzoom: 22
+                }, 'flight-path-line');
+                
+                document.getElementById(type === 'satellite' ? 'btn-satellite' : 'btn-street').classList.add('active');
             }
-        }
+        };
 
-        // Public API for Qt to call
         window.setCenter = function(lng, lat, zoom) {
-            map.flyTo({
-                center: [lng, lat],
-                zoom: zoom || map.getZoom(),
-                essential: true
-            });
+            map.flyTo({ center: [lng, lat], zoom: zoom || 14 });
         };
 
         window.displayFlightPath = function(geojsonString) {
             const geojson = JSON.parse(geojsonString);
             if (map.getSource('flight-path')) {
                 map.getSource('flight-path').setData(geojson);
-            }
-
-            // Update info panel
-            if (geojson.features && geojson.features.length > 0) {
-                const points = geojson.features.filter(f => f.geometry.type === 'Point');
-                document.getElementById('info-waypoints').textContent = points.length;
-                document.getElementById('info-panel').style.display = 'block';
-            }
-        };
-
-        window.updateFlightInfo = function(info) {
-            const data = JSON.parse(info);
-            if (data.distance) {
-                document.getElementById('info-distance').textContent =
-                    (data.distance / 1000).toFixed(2) + ' km';
-            }
-            if (data.time) {
-                document.getElementById('info-time').textContent =
-                    Math.ceil(data.time / 60) + ' min';
-            }
-            if (data.photos) {
-                document.getElementById('info-photos').textContent = data.photos;
+                
+                // Fit bounds
+                const bounds = new maplibregl.LngLatBounds();
+                geojson.features.forEach(f => {
+                    if (f.geometry.type === 'Point') bounds.extend(f.geometry.coordinates);
+                    if (f.geometry.type === 'LineString') f.geometry.coordinates.forEach(c => bounds.extend(c));
+                });
+                if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 50 });
             }
         };
 
-        window.switchBaseMap = function(type) {
-            // Switch between satellite and street view
-            const layers = map.getStyle().layers;
-            if (type === 'satellite') {
-                // Show satellite
-                if (!map.getLayer('satellite-layer')) {
-                    map.addLayer({
-                        id: 'satellite-layer',
-                        type: 'raster',
-                        source: 'satellite',
-                        minzoom: 0,
-                        maxzoom: 22
-                    }, 'flight-path-line');
-                }
-            } else {
-                // Show street
-                if (map.getLayer('satellite-layer')) {
-                    map.removeLayer('satellite-layer');
-                }
-                map.addLayer({
-                    id: 'osm-layer',
-                    type: 'raster',
-                    source: 'osm',
-                    minzoom: 0,
-                    maxzoom: 22
-                }, 'flight-path-line');
+        window.clearFlightPath = function() {
+            if (map.getSource('flight-path')) {
+                map.getSource('flight-path').setData({ type: 'FeatureCollection', features: [] });
             }
+            document.getElementById('flight-stats').style.display = 'none';
         };
 
-        // Turf.js for area calculations (inline minimal version)
-        const turf = {
-            area: function(feature) {
-                const coords = feature.geometry.coordinates[0];
-                let area = 0;
-                for (let i = 0; i < coords.length - 1; i++) {
-                    const p1 = coords[i];
-                    const p2 = coords[i + 1];
-                    area += this.deg2rad(p2[0] - p1[0]) * (2 + Math.sin(this.deg2rad(p1[1])) + Math.sin(this.deg2rad(p2[1])));
-                }
-                area = Math.abs(area * 6378137 * 6378137 / 2);
-                return area;
-            },
-            deg2rad: function(deg) {
-                return deg * Math.PI / 180;
-            }
+        window.updateFlightInfo = function(jsonStr) {
+            const data = JSON.parse(jsonStr);
+            document.getElementById('flight-stats').style.display = 'block';
+            document.getElementById('info-waypoints').textContent = data.photos / 3; // Approx
+            document.getElementById('info-distance').textContent = formatLength(data.distance);
+            document.getElementById('info-time').textContent = Math.round(data.time / 60) + " min";
+            document.getElementById('info-photos').textContent = data.photos;
         };
 
-        console.log('Map interface initialized');
+        // Utilities
+        function formatArea(m2) {
+            if (m2 > 1000000) return (m2 / 1000000).toFixed(2) + " km²";
+            return Math.round(m2).toLocaleString() + " m²";
+        }
+        function formatLength(m) {
+            if (m > 1000) return (m / 1000).toFixed(2) + " km";
+            return Math.round(m).toLocaleString() + " m";
+        }
+        
+        // Minimal Turf area/length
+        function turfArea(feature) {
+            // Spherical excess (approx)
+            const coords = feature.geometry.coordinates[0];
+            let area = 0;
+            if (coords.length < 3) return 0;
+            for (let i = 0; i < coords.length - 1; i++) {
+                const p1 = coords[i]; const p2 = coords[i+1];
+                area += (p2[0] - p1[0]) * (2 + Math.sin(p1[1] * Math.PI/180) + Math.sin(p2[1] * Math.PI/180));
+            }
+            return Math.abs(area * 6378137 * 6378137 / 2 * Math.PI/180);
+        }
+        
+        function turfPerimeter(feature) {
+             const coords = feature.geometry.coordinates[0];
+             let len = 0;
+             for (let i = 0; i < coords.length - 1; i++) {
+                 const p1 = coords[i]; const p2 = coords[i+1];
+                 const dLat = (p2[1] - p1[1]) * Math.PI/180;
+                 const dLon = (p2[0] - p1[0]) * Math.PI/180;
+                 const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(p1[1]*Math.PI/180)*Math.cos(p2[1]*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+                 len += 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 6378137;
+             }
+             return len;
+        }
+
+        // Start
+        initMap();
     </script>
 </body>
 </html>

@@ -7,6 +7,7 @@
 #include <QStatusBar>
 #include <QDockWidget>
 #include <QTabWidget>
+#include <QProgressDialog>
 
 namespace DroneMapper {
 namespace Models {
@@ -14,6 +15,9 @@ namespace Models {
 }
 namespace Core {
     class WeatherService;
+}
+namespace Photogrammetry {
+    class COLMAPIntegration;
 }
 namespace UI {
 
@@ -56,6 +60,11 @@ private slots:
     void onLoadDEM();
     void onPreviewMission();
     void onGenerateReport();
+
+    // COLMAP slots
+    void onCOLMAPProgress(double progress, const QString& message);
+    void onCOLMAPFinished();
+    void onCOLMAPError(const QString& error);
 
 private:
     void createActions();
@@ -119,6 +128,10 @@ private:
     TerrainElevationViewer *m_terrainViewer;
     PointCloudViewer *m_pointCloudViewer;
     SimulationPreviewWidget *m_simulationPreview;
+
+    // COLMAP Integration
+    Photogrammetry::COLMAPIntegration* m_colmapIntegration;
+    QProgressDialog* m_progressDialog;
 
     // Current state
     QString m_currentAreaGeoJson;
